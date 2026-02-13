@@ -22,12 +22,6 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
-      - name: Install staticcheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@latest
-
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
-
       - name: Install dependencies
         run: make deps
 
