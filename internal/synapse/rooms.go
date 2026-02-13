@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/amandahla/syncli/internal"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"maunium.net/go/mautrix"
@@ -49,15 +48,15 @@ func (s Space) Row() []interface{} {
 	return []interface{}{s.Name, s.Members, s.ChildCount, strings.Join(s.ChildRooms, ",")}
 }
 
-const MAX_CONCURRENT_REQUESTS = 10
-const MAX_CONCURRENT_REQUESTS_TIMEOUT = 5 * time.Minute
+const maxConcurrentRequests = 10
+const maxConcurrentRequestsTimeout = 5 * time.Minute
 
-func GetSpaces(config internal.Config, logger *logrus.Logger) ([]Space, error) {
+func GetSpaces(client SynapseClientInterface, logger *logrus.Logger) ([]Space, error) {
 	var spaces []Space
-	ctx, cancel := context.WithTimeout(context.Background(), MAX_CONCURRENT_REQUESTS_TIMEOUT) // Set a timeout for the entire operation to avoid hanging indefinitely in case of issues with the server
+	ctx, cancel := context.WithTimeout(context.Background(), maxConcurrentRequestsTimeout) // Set a timeout for the entire operation to avoid hanging indefinitely in case of issues with the server
 	defer cancel()
 	payload := []byte(`{"limit": 200, "filter": {"room_types": ["m.space"]}}`)
-	output, err := internal.Call(ctx, config, "/_matrix/client/v3/publicRooms", "POST", payload, false)
+	output, err := client.Call(ctx, "/_matrix/client/v3/publicRooms", "POST", payload, false)
 	if err != nil {
 		return spaces, err
 	}
@@ -69,13 +68,13 @@ func GetSpaces(config internal.Config, logger *logrus.Logger) ([]Space, error) {
 
 	g, ctx := errgroup.WithContext(ctx) // errgroup allows us to wait for all goroutines to finish and captures the first error that occurs
 	var mu sync.Mutex
-	sem := make(chan struct{}, MAX_CONCURRENT_REQUESTS)
+	sem := make(chan struct{}, maxConcurrentRequests)
 
 	logger.WithFields(logrus.Fields{
 		"event":                           "fetching_space_details",
 		"count":                           len(spaces),
-		"max_concurrent_requests":         MAX_CONCURRENT_REQUESTS,
-		"max_concurrent_requests_timeout": MAX_CONCURRENT_REQUESTS_TIMEOUT,
+		"max_concurrent_requests":         maxConcurrentRequests,
+		"max_concurrent_requests_timeout": maxConcurrentRequestsTimeout,
 	}).Debug("Fetching details for spaces")
 
 	for i := range spaces {
@@ -95,7 +94,7 @@ func GetSpaces(config internal.Config, logger *logrus.Logger) ([]Space, error) {
 				"event": "fetching_space_details",
 				"space": spaces[i].ID,
 			}).Debug("Fetching details for space")
-			output, err := internal.Call(ctx, config, "/_synapse/admin/v1/rooms/"+spaces[i].ID+"/state", "GET", nil, false)
+			output, err := client.Call(ctx, "/_synapse/admin/v1/rooms/"+spaces[i].ID+"/state", "GET", nil, false)
 			if err != nil {
 				return err
 			}

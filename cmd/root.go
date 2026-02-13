@@ -53,7 +53,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.syncli.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Enable debug logging")
 	rootCmd.PersistentFlags().IntVarP(&timeout, "timeout", "", 30, "Timeout for requests in seconds. (default: 30)")
-	viper.BindPFlag("timeout", rootCmd.PersistentFlags().Lookup("timeout"))
+	if err := viper.BindPFlag("timeout", rootCmd.PersistentFlags().Lookup("timeout")); err != nil {
+		panic(err)
+	}
 }
 
 // initConfig reads in config file and ENV variables if set.

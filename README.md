@@ -43,7 +43,7 @@ Run the CLI with:
 ## Project Structure
 - `main.go`: Entry point for the CLI
 - `cmd/`: Command definitions (root, get, spaces, etc.)
-- `internal/`: Internal logic (config, printer, requester, synapse API)
+- `internal/`: Internal logic (config, printer, synapse API)
 
 ## Configuration
 

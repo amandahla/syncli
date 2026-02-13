@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package internal
+package synapse
 
 import (
 	"bytes"
@@ -23,10 +23,31 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/amandahla/syncli/internal"
 	"github.com/cenkalti/backoff/v4"
 )
 
-const MAX_ELAPSED_TIME = 10 * time.Second
+const maxElapsedTime = 10 * time.Second
+
+// SynapseClientInterface defines the behavior for mocking
+type SynapseClientInterface interface {
+	Call(ctx context.Context, path string, method string, payload []byte, retry bool) ([]byte, error)
+}
+
+// SynapseClient holds the reusable HTTP client and configuration
+type SynapseClient struct {
+	Client *http.Client
+	Config internal.Config
+}
+
+func NewSynapseClient(config internal.Config) *SynapseClient {
+	return &SynapseClient{
+		Client: &http.Client{
+			Timeout: time.Duration(config.Timeout) * time.Second,
+		},
+		Config: config,
+	}
+}
 
 // Call makes an HTTP request to the specified path with the given method and configuration.
 // If retry is true, it will retry the request with exponential backoff in case of failure.
@@ -34,33 +55,37 @@ const MAX_ELAPSED_TIME = 10 * time.Second
 // It returns the response body as a byte slice or an error if the request fails.
 // Call makes an HTTP request to the specified path with the given method and configuration.
 // Accepts context.Context for cancellation and timeout propagation.
-func Call(ctx context.Context, config Config, path string, method string, payload []byte, retry bool) ([]byte, error) {
+func (s *SynapseClient) Call(ctx context.Context, path string, method string, payload []byte, retry bool) ([]byte, error) {
 	var output []byte
-	client := &http.Client{Timeout: time.Duration(config.Timeout) * time.Second}
-	synapseURL := fmt.Sprintf("%s%s", config.BaseURL, path)
+	synapseURL := fmt.Sprintf("%s%s", s.Config.BaseURL, path)
 	var sendBody io.Reader
 	if method == http.MethodPost && payload != nil {
 		sendBody = bytes.NewReader(payload)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, synapseURL, sendBody)
 	if err != nil {
-		return output, fmt.Errorf("Request to %s failed: %v", synapseURL, err)
+		return output, fmt.Errorf("request to %s failed: %v", synapseURL, err)
 	}
-	req.Header.Set("Authorization", "Bearer "+config.AccessToken)
+	req.Header.Set("Authorization", "Bearer "+s.Config.AccessToken)
 	if retry {
-		return callWithRetry(ctx, client, req, synapseURL)
+		return callWithRetry(ctx, s.Client, req, synapseURL)
 	}
-	resp, err := client.Do(req)
+	resp, err := s.Client.Do(req)
 	if err != nil {
-		return output, fmt.Errorf("Request to %s failed: %v", synapseURL, err)
+		return output, fmt.Errorf("request to %s failed: %v", synapseURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		cerr := resp.Body.Close()
+		if cerr != nil {
+			fmt.Printf("failed to close response body: %v\n", cerr)
+		}
+	}()
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
-		return output, fmt.Errorf("Request to %s returned unexpected status: %v", synapseURL, resp.Status)
+		return output, fmt.Errorf("request to %s returned unexpected status: %v", synapseURL, resp.Status)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return output, fmt.Errorf("Failed to read response body from %s: %v", synapseURL, err)
+		return output, fmt.Errorf("failed to read response body from %s: %v", synapseURL, err)
 	}
 
 	return body, nil
@@ -69,21 +94,26 @@ func Call(ctx context.Context, config Config, path string, method string, payloa
 // callWithRetry performs an HTTP request with exponential backoff, accepting context.Context.
 func callWithRetry(ctx context.Context, client *http.Client, req *http.Request, synapseURL string) ([]byte, error) {
 	b := backoff.NewExponentialBackOff()
-	b.MaxElapsedTime = MAX_ELAPSED_TIME
+	b.MaxElapsedTime = maxElapsedTime
 
 	var output []byte
 	err := backoff.Retry(func() error {
 		resp, err := client.Do(req.WithContext(ctx))
 		if err != nil {
-			return fmt.Errorf("Request to %s failed: %v", synapseURL, err)
+			return fmt.Errorf("request to %s failed: %v", synapseURL, err)
 		}
-		defer resp.Body.Close()
+		defer func() {
+			cerr := resp.Body.Close()
+			if cerr != nil {
+				fmt.Printf("failed to close response body: %v\n", cerr)
+			}
+		}()
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
-			return fmt.Errorf("Request to %s returned unexpected status: %v", synapseURL, resp.Status)
+			return fmt.Errorf("request to %s returned unexpected status: %v", synapseURL, resp.Status)
 		}
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("Failed to read response body from %s: %v", synapseURL, err)
+			return fmt.Errorf("failed to read response body from %s: %v", synapseURL, err)
 		}
 		output = body
 		return nil

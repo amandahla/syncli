@@ -21,6 +21,7 @@ These guidelines are designed for both human and AI agents (e.g., Gemini, Claude
 - **Effective Go:**
   - Avoid `init()` functions for logic; use them only for flag registration.
   - Prefer `io.Reader`/`io.Writer` over passing byte slices.
+  - Prefer Generics for collection-handling (slices) functions to avoid slice-to-interface conversion overhead.
 
 ## 3. Defensive Programming & HTTP
 
@@ -41,11 +42,10 @@ These guidelines are designed for both human and AI agents (e.g., Gemini, Claude
 
 ## 5. Quality Assurance
 
+- **API Testing Requirement:** All new functions added under `internal/synapse` that interact with the Synapse API must include corresponding unit tests.
+- **Testing Guidance:** Use table-driven tests and mock clients to simulate API responses and errors. See `internal/synapse/rooms_test.go` for an example.
+- **Pre-PR Checklist:** Before submitting a pull request, ensure that `make audit` passes with no errors and that the binary builds successfully with `make build`.
 - **Makefile:** Use the provided Makefile for build, test, lint, and formatting tasks.
-- **Linting:** Use [golangci-lint](https://github.com/golangci/golangci-lint) for linting (see `make lint`).
-- **Table-Driven Tests:** Mandatory for logic in `internal/`.
-- **Golden Files:** Use "golden file" testing for complex CLI output.
-- **Mocking:** Use interfaces to mock internal calls or the HTTP client for error handling tests.
 
 ## 6. Documentation & Maintenance
 

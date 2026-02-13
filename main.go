@@ -15,8 +15,11 @@ limitations under the License.
 */
 package main
 
-import "github.com/amandahla/syncli/cmd"
+import (
+	"github.com/amandahla/syncli/cmd"
+)
 
 func main() {
 	cmd.Execute()
+
 }

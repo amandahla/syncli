@@ -43,7 +43,8 @@ func init() {
 }
 
 func getSpaces(config internal.Config) error {
-	spaces, err := synapse.GetSpaces(config, logger)
+	client := synapse.NewSynapseClient(config)
+	spaces, err := synapse.GetSpaces(client, logger)
 	if err != nil {
 		return err
 	}

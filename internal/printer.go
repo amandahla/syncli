@@ -16,6 +16,7 @@ limitations under the License.
 package internal
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -27,6 +28,10 @@ type Printable interface {
 }
 
 func Print[P Printable](output []P, csv bool) {
+	if len(output) == 0 {
+		fmt.Println("No data to display")
+		return
+	}
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	header := dataToRow(output[0].Header())
