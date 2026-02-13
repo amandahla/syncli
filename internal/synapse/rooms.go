@@ -104,13 +104,19 @@ func GetSpaces(client SynapseClientInterface, logger *logrus.Logger) ([]Space, e
 				return err
 			}
 
-			mu.Lock()
+			childCount := 0
+			childRooms := make([]string, 0)
+
 			for _, event := range resp.State {
-				if event.Type.String() == "m.space.child" {
-					spaces[i].ChildCount++
-					spaces[i].ChildRooms = append(spaces[i].ChildRooms, *event.StateKey)
+				if event.Type.String() == "m.space.child" && event.StateKey != nil {
+					childCount++
+					childRooms = append(childRooms, *event.StateKey)
 				}
 			}
+
+			mu.Lock()
+			spaces[i].ChildCount += childCount
+			spaces[i].ChildRooms = append(spaces[i].ChildRooms, childRooms...)
 			mu.Unlock()
 
 			return nil
