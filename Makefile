@@ -32,6 +32,7 @@ run:
 # Install dependencies
 deps:
 	go mod tidy
+	go mod download
 
 # Run all checks
 .PHONY: audit
